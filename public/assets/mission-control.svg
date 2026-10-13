@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" fill="none" role="img" aria-label="Illustrated mission control preview">
+  <rect width="640" height="360" rx="24" fill="#0C1830"/>
+  <g opacity="0.35" stroke="#3EE0FF">
+    <path d="M0 40H640M0 80H640M0 120H640M0 160H640M0 200H640M0 240H640M0 280H640M0 320H640"/>
+    <path d="M40 0V360M80 0V360M120 0V360M160 0V360M200 0V360M240 0V360M280 0V360M320 0V360M360 0V360M400 0V360M440 0V360M480 0V360M520 0V360M560 0V360M600 0V360"/>
+  </g>
+  <circle cx="430" cy="170" r="78" stroke="#3EE0FF" stroke-width="8"/>
+  <circle cx="430" cy="170" r="54" stroke="#4C8DFF" stroke-width="2"/>
+  <path d="M70 230c30-50 40-50 60 0s30 50 60 0 30-50 60 0 30 50 60 0" stroke="#3EE0FF" stroke-width="3" stroke-linecap="round"/>
+  <rect x="70" y="70" width="180" height="78" rx="12" stroke="#8B7CFF" stroke-width="2"/>
+  <circle cx="430" cy="170" r="6" fill="#8B7CFF"/>
+</svg>

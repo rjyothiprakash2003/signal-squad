@@ -1,0 +1,120 @@
+import { expect, test, type Page } from '@playwright/test'
+import { mkdirSync } from 'node:fs'
+import { campaign } from '../../server/puzzles.ts'
+
+mkdirSync('docs/screenshots', { recursive: true })
+
+async function ready(page: Page) {
+  await page.getByRole('button', { name: 'I understand' }).click()
+  await page.getByRole('button', { name: 'Ready up' }).click()
+  await expect(page.getByRole('button', { name: 'Ready' })).toBeVisible()
+}
+
+test.beforeEach(async ({ request }) => {
+  await expect.poll(async () => (await request.get('/api/health')).ok()).toBe(true)
+})
+
+test('two players solve a mission and stay in sync', async ({ browser, page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.goto('/')
+  await page.screenshot({ path: 'docs/screenshots/landing.png' })
+  await page.getByRole('form', { name: 'Create a room' }).getByLabel('Agent name').fill('Ada')
+  await page.getByRole('button', { name: 'Create room' }).click()
+  await page.waitForURL(/\/room\//)
+  const code = (await page.getByTestId('room-code').innerText()).trim()
+  expect(code).toMatch(/^[A-HJ-NP-Z2-9]{5}$/)
+
+  const guestContext = await browser.newContext()
+  const guest = await guestContext.newPage()
+  await guest.setViewportSize({ width: 1280, height: 800 })
+  await guest.goto(`/room/${code}`)
+  await guest.getByLabel('Agent name').fill('Bo')
+  await guest.getByRole('button', { name: 'Join room' }).click()
+  await expect(guest.getByTestId('player-list')).toContainText('Ada')
+  await expect(page.getByTestId('player-list')).toContainText('Bo')
+  await ready(page)
+  await ready(guest)
+  await page.screenshot({ path: 'docs/screenshots/lobby.png' })
+  await page.getByRole('button', { name: 'Start mission' }).click()
+  await expect(page.getByTestId('countdown')).toBeVisible()
+  await expect(guest.getByTestId('countdown')).toBeVisible()
+
+  const own = campaign[0].bundles[0].map((clue) => clue.text)
+  const secret = campaign[0].bundles[1].map((clue) => clue.text)
+  const hostClues = page.getByTestId('clue-panel')
+  for (const text of own) await expect(hostClues).toContainText(text)
+  for (const text of secret) await expect(hostClues).not.toContainText(text)
+  const guestClues = guest.getByTestId('clue-panel')
+  for (const text of secret) await expect(guestClues).toContainText(text)
+  await expect(guestClues).not.toContainText(own[0])
+  await page.screenshot({ path: 'docs/screenshots/mission-host.png' })
+  await guest.screenshot({ path: 'docs/screenshots/mission-guest.png' })
+
+  await page.getByLabel('Message the squad').fill('North fragment ready')
+  await page.getByRole('button', { name: 'Send' }).click()
+  await expect(guest.getByTestId('chat-log')).toContainText('North fragment ready')
+  await guest.getByLabel('Message the squad').fill('South fragment ready')
+  await guest.getByRole('button', { name: 'Send' }).click()
+  await expect(page.getByTestId('chat-log')).toContainText('South fragment ready')
+
+  const hostClock = Number((await page.getByTestId('countdown').innerText()).match(/(\d+):(\d{2})/)?.[0].split(':').reduce((m, s) => Number(m) * 60 + Number(s)))
+  const guestClock = Number((await guest.getByTestId('countdown').innerText()).match(/(\d+):(\d{2})/)?.[0].split(':').reduce((m, s) => Number(m) * 60 + Number(s)))
+  expect(Math.abs(hostClock - guestClock)).toBeLessThanOrEqual(2)
+
+  await page.getByLabel('Four-digit code').fill('0000')
+  await page.getByRole('button', { name: 'Transmit code' }).click()
+  await expect(guest.getByTestId('chat-log').getByText(/Incorrect/)).toBeVisible()
+  await page.getByLabel('Four-digit code').fill(campaign[0].answer)
+  await page.getByRole('button', { name: 'Transmit code' }).click()
+  await expect(page.getByTestId('result')).toBeVisible()
+  await expect(guest.getByTestId('result')).toBeVisible()
+  await expect(page.getByTestId('result')).toContainText(campaign[0].answer)
+  const hostScore = await page.getByTestId('team-score').innerText()
+  const guestScore = await guest.getByTestId('team-score').innerText()
+  expect(hostScore).toBe(guestScore)
+  expect(Number(hostScore.replace(/\D/g, ''))).toBeGreaterThan(500)
+  await page.screenshot({ path: 'docs/screenshots/results.png' })
+
+  await page.getByRole('button', { name: 'Next mission' }).click()
+  await expect(page.getByTestId('mission-title')).toHaveText(campaign[1].title)
+  await expect(guest.getByTestId('mission-title')).toHaveText(campaign[1].title)
+  const scoreAfter = await page.getByTestId('team-score').innerText()
+  expect(scoreAfter).toBe(hostScore)
+
+  await page.reload()
+  await expect(page.getByTestId('mission-title')).toHaveText(campaign[1].title)
+  await expect(page.getByTestId('clue-panel')).toContainText(campaign[1].bundles[0][0].text)
+
+  await guest.getByRole('button', { name: 'Leave room' }).click()
+  await guest.getByRole('button', { name: 'Leave', exact: true }).click()
+  await expect(page.getByTestId('player-list')).not.toContainText('Bo')
+  await guestContext.close()
+})
+
+test('mobile landing and lobby do not overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Decode before zero.' })).toBeVisible()
+  const landingOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+  expect(landingOverflow).toBe(false)
+  await page.screenshot({ path: 'docs/screenshots/mobile-landing.png' })
+  await page.getByRole('form', { name: 'Create a room' }).getByLabel('Agent name').fill('Ada')
+  await page.getByRole('button', { name: 'Create room' }).click()
+  await page.getByRole('button', { name: 'I understand' }).click()
+  const lobbyOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+  expect(lobbyOverflow).toBe(false)
+})
+
+test('bad codes and missing art stay usable', async ({ page }) => {
+  await page.route('**/assets/mission-control.jpg', (route) => route.abort())
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Decode before zero.' })).toBeVisible()
+  await expect(page.getByRole('img', { name: /Mission control desk|Illustrated mission control/ })).toBeVisible()
+  await page.getByRole('form', { name: 'Join a room' }).getByLabel('Room code').fill('ZZZZZ')
+  await page.getByRole('form', { name: 'Join a room' }).getByLabel('Agent name').fill('Bo')
+  await page.getByRole('button', { name: 'Join room' }).click()
+  await expect(page.getByRole('alert')).toContainText(/no active room/i)
+  await page.getByRole('form', { name: 'Create a room' }).getByLabel('Agent name').fill('A')
+  await page.getByRole('button', { name: 'Create room' }).click()
+  await expect(page.getByRole('alert')).toContainText(/at least 2/i)
+})

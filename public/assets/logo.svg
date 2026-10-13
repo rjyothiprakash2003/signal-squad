@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none" role="img" aria-label="Signal Squad">
+  <rect width="80" height="80" rx="18" fill="#07111F"/>
+  <path d="M40 14 62.5 27v26L40 66 17.5 53V27L40 14Z" stroke="#3EE0FF" stroke-width="2.5"/>
+  <path d="M27 46c2.2-9 6.4-13 13-13s10.8 4 13 13" stroke="#4C8DFF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M32 46c1.3-5 3.6-7.5 8-7.5S46.7 41 48 46" stroke="#4C8DFF" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="40" cy="46" r="3.2" fill="#8B7CFF"/>
+</svg>
